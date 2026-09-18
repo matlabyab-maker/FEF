@@ -58,7 +58,10 @@ public class MainActivity extends Activity {
 
     void browse(DocumentFile dir){
         if(dir==null){ Toast.makeText(this,"Storage is not available",Toast.LENGTH_SHORT).show(); return; }
-        path.setText(dir.getName()!=null?dir.getName():u.toString()); list.removeAllViews();
+        currentDir = dir;
+        String dirName = dir.getName();
+        path.setText(dirName != null ? dirName : dir.getUri().toString());
+        list.removeAllViews();
         Button home=button("⌂ Storage locations"); home.setOnClickListener(v->buildHome()); list.addView(home,new LinearLayout.LayoutParams(-1,dp(54)));
         DocumentFile[] files=dir.listFiles(); Arrays.sort(files,(a,b)->{ boolean ad=a.isDirectory(), bd=b.isDirectory(); if(ad!=bd)return ad?-1:1; return a.getName()==null?"".compareTo(b.getName()==null?"":b.getName()):a.getName().compareToIgnoreCase(b.getName()); });
         if(files.length==0){ TextView empty=text("This folder is empty",16); list.addView(empty,new LinearLayout.LayoutParams(-1,dp(60))); return; }
