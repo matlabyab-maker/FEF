@@ -1,4 +1,4 @@
-Cloud Storage Explorer 1
+Cloud Explorer 1
 
 نسخه تمیز اولیه برای Repository جدید.
 

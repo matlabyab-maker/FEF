@@ -1,42 +1,86 @@
-package com.cloudstorageexplorer.android;
+package com.cloudstorageexplorer.app;
 
 import android.app.*;
 import android.content.*;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
-import android.provider.Settings;
+import android.provider.DocumentsContract;
 import android.view.*;
 import android.widget.*;
+import androidx.documentfile.provider.DocumentFile;
 import java.util.*;
 
 public class MainActivity extends Activity {
-    LinearLayout root, list; TextView path;
-    static final int PICK_TREE=41, SEND=42;
+    private static final int PICK_TREE = 100;
+    private LinearLayout list, root;
+    private TextView path;
+    private DocumentFile currentDir;
+    private final ArrayDeque<DocumentFile> history = new ArrayDeque<>();
+    private final ArrayList<Uri> savedRoots = new ArrayList<>();
+    private android.content.SharedPreferences prefs;
+
     int dp(float v){ return (int)(v*getResources().getDisplayMetrics().density+.5f); }
-    TextView tv(String s,int size){ TextView t=new TextView(this); t.setText(s); t.setTextSize(size); t.setTextColor(Color.DKGRAY); t.setGravity(Gravity.CENTER_VERTICAL); t.setPadding(dp(14),dp(8),dp(14),dp(8)); return t; }
-    Button btn(String s){ Button b=new Button(this); b.setText(s); b.setAllCaps(false); b.setMinHeight(dp(52)); return b; }
-    @Override public void onCreate(Bundle b){ super.onCreate(b); build(); }
-    void build(){
+    TextView text(String s,float size){ TextView t=new TextView(this); t.setText(s); t.setTextSize(size); t.setTextColor(Color.DKGRAY); t.setGravity(Gravity.CENTER_VERTICAL); t.setPadding(dp(14),dp(7),dp(14),dp(7)); return t; }
+    Button button(String s){ Button b=new Button(this); b.setText(s); b.setTextSize(14); b.setAllCaps(false); b.setMinHeight(dp(52)); return b; }
+
+    @Override public void onCreate(Bundle b){ super.onCreate(b); prefs=getSharedPreferences("roots",MODE_PRIVATE); loadRoots(); buildHome(); }
+
+    void buildHome(){
         root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(Color.WHITE);
-        LinearLayout bar=new LinearLayout(this); bar.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title=tv("Cloud Explorer",20); title.setTypeface(null,1); bar.addView(title,new LinearLayout.LayoutParams(0,dp(62),1));
-        Button menu=btn("☰"); bar.addView(menu,new LinearLayout.LayoutParams(dp(64),dp(62))); root.addView(bar);
-        path=tv("Internal Storage",16); path.setBackgroundColor(Color.rgb(245,245,245)); root.addView(path,new LinearLayout.LayoutParams(-1,dp(48)));
-        LinearLayout actions=new LinearLayout(this); actions.setPadding(dp(6),0,dp(6),0);
-        Button add=btn("☁ Add Cloud"); add.setOnClickListener(v->addCloud()); actions.addView(add,new LinearLayout.LayoutParams(0,dp(58),1));
-        Button share=btn("↗ Share"); share.setOnClickListener(v->shareFile()); actions.addView(share,new LinearLayout.LayoutParams(0,dp(58),1)); root.addView(actions);
-        TextView info=tv("Cloud storage uses Android's standard provider system. Google Drive, Dropbox, OneDrive, Box and other installed providers can appear here when available.",14); info.setPadding(dp(14),dp(10),dp(14),dp(10)); root.addView(info);
+        LinearLayout top=new LinearLayout(this); top.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title=text("Cloud Storage Explorer",20); title.setTypeface(null,1); top.addView(title,new LinearLayout.LayoutParams(0,dp(60),1));
+        Button add=button("☁ Add Cloud"); add.setOnClickListener(v->pickRoot()); top.addView(add,new LinearLayout.LayoutParams(dp(125),dp(60)));
+        root.addView(top);
+        path=text("Storage locations",16); path.setBackgroundColor(Color.rgb(245,245,245)); root.addView(path,new LinearLayout.LayoutParams(-1,dp(46)));
+        LinearLayout bar=new LinearLayout(this);
+        Button device=button("📱 Open Storage"); device.setOnClickListener(v->pickRoot()); bar.addView(device,new LinearLayout.LayoutParams(0,dp(56),1));
+        Button back=button("← Back"); back.setOnClickListener(v->goBack()); bar.addView(back,new LinearLayout.LayoutParams(0,dp(56),1));
+        root.addView(bar);
         list=new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL); ScrollView sv=new ScrollView(this); sv.addView(list); root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));
-        addStorage("📱  Internal Storage","/storage/emulated/0"); addStorage("💾  SD Card","Removable storage (if available)"); addStorage("🔌  USB / External HDD","OTG storage (when connected)");
-        TextView cloud=tv("☁  Cloud providers",18); cloud.setTypeface(null,1); cloud.setPadding(dp(14),dp(18),dp(14),dp(8)); list.addView(cloud);
-        addProvider("Google Drive"); addProvider("Dropbox"); addProvider("OneDrive"); addProvider("Box"); addProvider("Other Android cloud providers");
-        setContentView(root);
+        setContentView(root); showRoots();
     }
-    void addStorage(String name,String sub){ LinearLayout row=new LinearLayout(this); row.setOrientation(LinearLayout.VERTICAL); row.setPadding(dp(6),dp(2),dp(6),dp(2)); TextView a=tv(name,17); TextView c=tv(sub,13); c.setTextColor(Color.GRAY); row.addView(a); row.addView(c); row.setOnClickListener(v->openTree()); list.addView(row,new LinearLayout.LayoutParams(-1,dp(72))); }
-    void addProvider(String name){ Button b=btn("☁  "+name); b.setOnClickListener(v->addCloud()); list.addView(b,new LinearLayout.LayoutParams(-1,dp(60))); }
-    void addCloud(){ Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE); i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION|Intent.FLAG_GRANT_PREFIX_URI_PERMISSION); startActivityForResult(i,PICK_TREE); }
-    void openTree(){ addCloud(); }
-    void shareFile(){ Intent i=new Intent(Intent.ACTION_SEND); i.setType("*/*"); i.putExtra(Intent.EXTRA_TEXT,"Select a file in Fast File Manager, then use Share to send it to Google Drive, Dropbox, OneDrive, Box or another installed provider."); startActivity(Intent.createChooser(i,"Share to cloud or app")); }
-    @Override protected void onActivityResult(int r,int c,Intent d){ super.onActivityResult(r,c,d); if(r==PICK_TREE && c==RESULT_OK && d!=null){ Uri u=d.getData(); try{ getContentResolver().takePersistableUriPermission(u,Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION); }catch(Exception ignored){} path.setText("Cloud added: "+u.toString()); Toast.makeText(this,"Cloud storage added",Toast.LENGTH_SHORT).show(); } }
+
+    void showRoots(){
+        list.removeAllViews();
+        addSection("📱 Device and removable storage");
+        TextView hint=text("Android opens the storage/provider selector. Choose Internal Storage, SD Card or a USB/OTG drive. The selected location is remembered.",14); hint.setTextColor(Color.GRAY); list.addView(hint,new LinearLayout.LayoutParams(-1,dp(68)));
+        Button open=button("📂 Select a storage location"); open.setOnClickListener(v->pickRoot()); list.addView(open,new LinearLayout.LayoutParams(-1,dp(62)));
+        if(!savedRoots.isEmpty()) addSection("☁ Saved cloud / storage locations");
+        for(Uri u:savedRoots){ DocumentFile d=DocumentFile.fromTreeUri(this,u); String name=d!=null&&d.getName()!=null?d.getName():u.toString(); Button r=button("☁  "+name); r.setOnClickListener(v->openRoot(u)); list.addView(r,new LinearLayout.LayoutParams(-1,dp(62))); }
+    }
+
+    void addSection(String s){ TextView h=text(s,18); h.setTypeface(null,1); h.setPadding(dp(14),dp(16),dp(14),dp(8)); list.addView(h,new LinearLayout.LayoutParams(-1,dp(52))); }
+
+    void pickRoot(){ Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE); i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION|Intent.FLAG_GRANT_PREFIX_URI_PERMISSION); startActivityForResult(i,PICK_TREE); }
+
+    void openRoot(Uri u){ history.clear(); DocumentFile d=DocumentFile.fromTreeUri(this,u); if(d!=null) browse(d); }
+
+    void browse(DocumentFile dir){
+        if(dir==null){ Toast.makeText(this,"Storage is not available",Toast.LENGTH_SHORT).show(); return; }
+        path.setText(dir.getName()!=null?dir.getName():u.toString()); list.removeAllViews();
+        Button home=button("⌂ Storage locations"); home.setOnClickListener(v->buildHome()); list.addView(home,new LinearLayout.LayoutParams(-1,dp(54)));
+        DocumentFile[] files=dir.listFiles(); Arrays.sort(files,(a,b)->{ boolean ad=a.isDirectory(), bd=b.isDirectory(); if(ad!=bd)return ad?-1:1; return a.getName()==null?"".compareTo(b.getName()==null?"":b.getName()):a.getName().compareToIgnoreCase(b.getName()); });
+        if(files.length==0){ TextView empty=text("This folder is empty",16); list.addView(empty,new LinearLayout.LayoutParams(-1,dp(60))); return; }
+        for(DocumentFile f:files) addFileRow(f);
+    }
+
+    void addFileRow(DocumentFile f){
+        LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL);
+        String icon=f.isDirectory()?"📁":"📄"; TextView name=text(icon+"  "+(f.getName()==null?"Unnamed":f.getName()),16); row.addView(name,new LinearLayout.LayoutParams(0,dp(64),1));
+        if(!f.isDirectory()){ Button sh=button("↗"); sh.setMinWidth(dp(54)); sh.setOnClickListener(v->share(f)); row.addView(sh,new LinearLayout.LayoutParams(dp(60),dp(60))); }
+        row.setOnClickListener(v->{ if(f.isDirectory()){ if(currentDir!=null) history.push(currentDir); browse(f); } else { share(f); } });
+        list.addView(row,new LinearLayout.LayoutParams(-1,dp(68)));
+    }
+
+    void share(DocumentFile f){
+        Intent i=new Intent(Intent.ACTION_SEND); i.setType(f.getType()!=null?f.getType():"application/octet-stream"); i.putExtra(Intent.EXTRA_STREAM,f.getUri()); i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); startActivity(Intent.createChooser(i,"Share file"));
+    }
+
+    void goBack(){ if(!history.isEmpty()) browse(history.pop()); else buildHome(); }
+
+    void loadRoots(){ String all=prefs.getString("uris",""); if(!all.isEmpty()) for(String s:all.split("\\n")){ try{ savedRoots.add(Uri.parse(s)); }catch(Exception ignored){} } }
+    void saveRoot(Uri u){ StringBuilder sb=new StringBuilder(); for(Uri x:savedRoots){ if(!x.equals(u)) sb.append(x).append('\n'); } sb.append(u); prefs.edit().putString("uris",sb.toString()).apply(); }
+
+    @Override protected void onActivityResult(int r,int c,Intent d){ super.onActivityResult(r,c,d); if(r==PICK_TREE && c==RESULT_OK && d!=null && d.getData()!=null){ Uri u=d.getData(); try{ getContentResolver().takePersistableUriPermission(u,Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION); }catch(Exception ignored){} if(!savedRoots.contains(u)){savedRoots.add(u); saveRoot(u);} openRoot(u); } }
 }
