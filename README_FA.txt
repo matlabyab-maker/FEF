@@ -1,13 +1,21 @@
-Cloud Explorer 1
+Cloud Explorer Final 1.0
 
-نسخه تمیز اولیه برای Repository جدید.
+نسخه تمیز و نهایی پروژه پایه File Explorer + Cloud برای Android.
 
-امکانات پایه این نسخه:
-- Add Cloud با Android Storage Access Framework
-- پشتیبانی از Cloud Providerهای نصب‌شده که Android به‌عنوان Document Provider ارائه می‌کند؛ از جمله Google Drive، Dropbox، OneDrive و Box در صورت در دسترس بودن روی دستگاه
-- نگهداری دسترسی انتخاب‌شده با Persistable URI Permission
-- Share با استاندارد Android برای ارسال فایل به برنامه‌های ابری و سایر برنامه‌های نصب‌شده
-- Internal Storage / SD Card / USB-OTG به‌عنوان ورودی‌های File Explorer
-- Workflow مستقل GitHub Actions؛ بدون android-actions/setup-android@v3 و بدون پکیج منسوخ tools
+قابلیت‌های پیاده‌سازی‌شده:
+- نمایش Internal Storage و مسیرهای قابل دسترس سیستم
+- انتخاب Storage / SD / USB / HDD و Cloud از Android Storage Access Framework
+- ورود به پوشه و برگشت
+- نمایش فایل و پوشه با نوع و اندازه
+- انتخاب چندگانه
+- Copy / Cut / Paste / Delete / Rename
+- Share فایل‌ها با FileProvider و برنامه‌های دیگر
+- افزودن Cloud Provider از طریق ACTION_OPEN_DOCUMENT_TREE؛ سرویس‌هایی مثل Google Drive، Dropbox، OneDrive و Box در صورت ارائه Provider توسط برنامه نصب‌شده قابل انتخاب‌اند
+- Favorites پایه
+- Search در پوشه جاری
+- Sort بر اساس Name / Type / Size / Modified
+- Properties و Copy متن اطلاعات
+- ساخت ZIP از فایل/پوشه انتخاب‌شده
+- تشخیص ظاهری انواع APK/XAPK/APKS/AAB، ZIP/RAR/7Z، PDF، تصویر، ویدئو و صدا
 
-نکته: اتصال مستقیم API به هر سرویس ابری (OAuth/API اختصاصی) مرحله جداگانه‌ای است. این نسخه از روش استاندارد Android استفاده می‌کند تا APK سبک بماند.
+توجه: دسترسی به Storage و Cloud تابع مجوزهای Android و Provider نصب‌شده است. این پروژه عمداً بدون SDK اختصاصی سرویس‌های ابری ساخته شده تا APK سبک بماند.
