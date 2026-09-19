@@ -28,8 +28,9 @@ public class MainActivity extends Activity {
     final ArrayList<Uri> cloudRoots=new ArrayList<>();
     SharedPreferences prefs;
     String sort="name"; boolean foldersFirst=true; boolean descending=false;
+    String displayMode="column"; int gridColumns=2; int gridRows=6; int gridPage=0;
 
-    @Override public void onCreate(Bundle b){super.onCreate(b); prefs=getSharedPreferences("state",0); buildUI(); loadClouds(); showHome(); requestStorageAccess();}
+    @Override public void onCreate(Bundle b){super.onCreate(b); prefs=getSharedPreferences("state",0); displayMode=prefs.getString("view","column"); gridColumns=prefs.getInt("gridColumns",2); gridRows=prefs.getInt("gridRows",6); buildUI(); loadClouds(); showHome(); requestStorageAccess();}
 
     TextView tv(String s,int sp){TextView t=new TextView(this);t.setText(s);t.setTextSize(sp);t.setTextColor(Color.DKGRAY);t.setPadding(18,14,18,14);return t;}
     Button btn(String s){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setMinHeight(56);return b;}
@@ -37,7 +38,7 @@ public class MainActivity extends Activity {
     void buildUI(){
         root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); setContentView(root);
         LinearLayout bar=new LinearLayout(this); bar.setOrientation(LinearLayout.HORIZONTAL);
-        String[] bs={"☰","←","⟳","Select","Copy","Cut","Paste","Delete","Rename","Share","ZIP","Properties","Search","Cloud +","Sort","Favorites"};
+        String[] bs={"☰","←","⟳","Select","Copy","Cut","Paste","Delete","Rename","Share","ZIP","Properties","Search","Cloud +","Sort","View","Favorites"};
         for(String s:bs){Button b=btn(s);bar.addView(b,new LinearLayout.LayoutParams(-2,-2));b.setOnClickListener(v->action(s));}
         HorizontalScrollView hsv=new HorizontalScrollView(this);hsv.addView(bar);root.addView(hsv,new LinearLayout.LayoutParams(-1,-2));
         path=tv("Storage & Cloud",18);root.addView(path);
@@ -126,36 +127,45 @@ public class MainActivity extends Activity {
     }
 
     void openLocal(File f){if(f==null){toast("Storage unavailable");return;}currentDir=f;currentTree=null;refreshLocal();}
-    void refreshLocal(){list.removeAllViews();if(currentDir==null){showHome();return;}path.setText(currentDir.getAbsolutePath());File[] a=currentDir.listFiles();items.clear();if(a!=null)items.addAll(Arrays.asList(a));sortItems();for(File f:items)addFileRow(f);status.setText(items.size()+" items • "+human(currentDir.getFreeSpace())+" free / "+human(currentDir.getTotalSpace()));}
+    void refreshLocal(){list.removeAllViews();if(currentDir==null){showHome();return;}path.setText(currentDir.getAbsolutePath());File[] a=currentDir.listFiles();items.clear();if(a!=null)items.addAll(Arrays.asList(a));sortItems();renderLocalItems();status.setText(items.size()+" items • "+human(currentDir.getFreeSpace())+" free / "+human(currentDir.getTotalSpace()));}
 
     void openCloud(Uri u){
         currentTree=u; currentDir=null; list.removeAllViews();
         DocumentFile d=DocumentFile.fromTreeUri(this,u);
-        if(d==null) d=DocumentFile.fromSingleUri(this,u);
         if(d==null || !d.isDirectory()){toast("Cloud folder unavailable"); return;}
-        path.setText("☁️ "+(d.getName()==null?u.toString():d.getName()));
-        DocumentFile[] a=d.listFiles(); sortDocs(a); for(DocumentFile f:a) addDocRow(f);
+        path.setText("☁️ "+(d.getName()==null?"Cloud Storage":d.getName()));
+        DocumentFile[] a=d.listFiles(); sortDocs(a); renderCloudItems(a);
         status.setText(a.length+" items • Cloud/SAF");
     }
 
     void sortDocs(DocumentFile[] a){Arrays.sort(a,(x,y)->{if(foldersFirst&&x.isDirectory()!=y.isDirectory())return x.isDirectory()?-1:1;String xn=x.getName()==null?"":x.getName();String yn=y.getName()==null?"":y.getName();int c=xn.compareToIgnoreCase(yn);return descending?-c:c;});}
-    void addDocRow(DocumentFile f){
-        LinearLayout r=new LinearLayout(this); r.setGravity(Gravity.CENTER_VERTICAL);
-        TextView n=tv((f.isDirectory()?"📁 ":icon(f.getName())+" ")+(f.getName()==null?"Unnamed":f.getName()),17);
-        r.addView(n,new LinearLayout.LayoutParams(0,-2,1));
-        TextView z=tv(f.isDirectory()?"Folder":human(f.length()),13); r.addView(z);
-        r.setOnClickListener(v->{
-            if(f.isDirectory()){ currentTree=f.getUri(); openCloud(f.getUri()); } else { toast("Cloud file: "+f.getName()); }
-        });
-        r.setOnLongClickListener(v->{toast("Cloud item: "+f.getName());return true;}); list.addView(r);
+
+    void renderCloudItems(DocumentFile[] docs){
+        list.removeAllViews();
+        if(displayMode.equals("table")){addTableHeader();for(DocumentFile f:docs)addDocTableRow(f);}
+        else if(displayMode.equals("grid")){int perPage=Math.max(1,gridColumns*gridRows);int pages=(docs.length+perPage-1)/perPage;if(gridPage>=pages)gridPage=Math.max(0,pages-1);int from=gridPage*perPage,to=Math.min(docs.length,from+perPage);LinearLayout row=null;int col=0;for(int i=from;i<to;i++){if(col==0){row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);list.addView(row,new LinearLayout.LayoutParams(-1,-2));}row.addView(createDocGridCell(docs[i]),new LinearLayout.LayoutParams(0,-2,1));col++;if(col==gridColumns)col=0;}if(col!=0)while(col<gridColumns){row.addView(new Space(this),new LinearLayout.LayoutParams(0,1,1));col++;}addPager(pages);}
+        else {for(DocumentFile f:docs)addDocColumnRow(f);}
     }
 
+    void addDocColumnRow(DocumentFile f){LinearLayout r=new LinearLayout(this);r.setGravity(Gravity.CENTER_VERTICAL);r.setPadding(8,8,8,8);TextView n=tv((f.isDirectory()?"📁 ":icon(f.getName())+" ")+(f.getName()==null?"Unnamed":f.getName()),20);r.addView(n,new LinearLayout.LayoutParams(0,-2,1));TextView z=tv(f.isDirectory()?"Folder":human(f.length()),16);r.addView(z);r.setOnClickListener(v->{if(f.isDirectory())openCloud(f.getUri());else toast("Cloud file: "+f.getName());});r.setOnLongClickListener(v->{toast("Cloud item: "+f.getName());return true;});list.addView(r);}
+    void addTableHeader(){LinearLayout h=new LinearLayout(this);h.setOrientation(LinearLayout.HORIZONTAL);h.setPadding(8,10,8,10);addCell(h,"Name",1.8f,17);addCell(h,"Type",0.8f,15);addCell(h,"Size",0.8f,15);addCell(h,"Modified",1.2f,15);list.addView(h);}
+    void addDocTableRow(DocumentFile f){LinearLayout r=new LinearLayout(this);r.setOrientation(LinearLayout.HORIZONTAL);r.setGravity(Gravity.CENTER_VERTICAL);r.setPadding(8,8,8,8);String name=(f.isDirectory()?"📁 ":icon(f.getName())+" ")+(f.getName()==null?"Unnamed":f.getName());addCell(r,name,1.8f,17);addCell(r,f.isDirectory()?"Folder":extName(f.getName()),0.8f,14);addCell(r,f.isDirectory()?"—":human(f.length()),0.8f,14);addCell(r,"—",1.2f,14);r.setOnClickListener(v->{if(f.isDirectory())openCloud(f.getUri());else toast("Cloud file: "+f.getName());});list.addView(r);}
+    View createDocGridCell(DocumentFile f){LinearLayout c=new LinearLayout(this);c.setOrientation(LinearLayout.VERTICAL);c.setGravity(Gravity.CENTER);c.setPadding(4,12,4,12);c.setMinimumHeight(150);TextView ic=tv(f.isDirectory()?"📁":icon(f.getName()),56);ic.setGravity(Gravity.CENTER);c.addView(ic,new LinearLayout.LayoutParams(-1,78));TextView n=tv(f.getName()==null?"Unnamed":f.getName(),15);n.setGravity(Gravity.CENTER);c.addView(n,new LinearLayout.LayoutParams(-1,-2));TextView z=tv(f.isDirectory()?"Folder":human(f.length()),13);z.setGravity(Gravity.CENTER);c.addView(z,new LinearLayout.LayoutParams(-1,-2));c.setOnClickListener(v->{if(f.isDirectory())openCloud(f.getUri());else toast("Cloud file: "+f.getName());});return c;}
+    void addPager(int pages){if(pages<=1)return;LinearLayout p=new LinearLayout(this);p.setGravity(Gravity.CENTER);Button prev=btn("‹ Previous"),next=btn("Next ›");TextView info=tv("Page "+(gridPage+1)+" / "+pages,15);p.addView(prev);p.addView(info);p.addView(next);prev.setEnabled(gridPage>0);next.setEnabled(gridPage<pages-1);prev.setOnClickListener(v->{gridPage--;openCloud(currentTree);});next.setOnClickListener(v->{gridPage++;openCloud(currentTree);});list.addView(p);}
 
     void sortItems(){Collections.sort(items,(a,b)->{if(foldersFirst&&a.isDirectory()!=b.isDirectory())return a.isDirectory()?-1:1;int c;if(sort.equals("size"))c=Long.compare(a.length(),b.length());else if(sort.equals("date"))c=Long.compare(a.lastModified(),b.lastModified());else if(sort.equals("type"))c=ext(a).compareToIgnoreCase(ext(b));else c=a.getName().compareToIgnoreCase(b.getName());return descending?-c:c;});}
-    void addFileRow(File f){LinearLayout r=new LinearLayout(this);r.setGravity(Gravity.CENTER_VERTICAL);TextView n=tv((f.isDirectory()?"📁 ":icon(f)+" ")+f.getName(),17);r.addView(n,new LinearLayout.LayoutParams(0,-2,1));TextView z=tv(f.isDirectory()?"Folder":human(f.length()),13);r.addView(z);r.setOnClickListener(v->{if(f.isDirectory())openLocal(f);else selectOne(f);});r.setOnLongClickListener(v->{selectOne(f);return true;});list.addView(r);}
+    void renderLocalItems(){if(displayMode.equals("table")){addTableHeader();for(File f:items)addFileTableRow(f);}else if(displayMode.equals("grid")){int perPage=Math.max(1,gridColumns*gridRows);int pages=(items.size()+perPage-1)/perPage;if(gridPage>=pages)gridPage=Math.max(0,pages-1);int from=gridPage*perPage,to=Math.min(items.size(),from+perPage);LinearLayout row=null;int col=0;for(int i=from;i<to;i++){if(col==0){row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);list.addView(row,new LinearLayout.LayoutParams(-1,-2));}row.addView(createFileGridCell(items.get(i)),new LinearLayout.LayoutParams(0,-2,1));col++;if(col==gridColumns)col=0;}if(col!=0)while(col<gridColumns){row.addView(new Space(this),new LinearLayout.LayoutParams(0,1,1));col++;}addLocalPager(pages);}else{for(File f:items)addFileColumnRow(f);}}
+    void addLocalPager(int pages){if(pages<=1)return;LinearLayout p=new LinearLayout(this);p.setGravity(Gravity.CENTER);Button prev=btn("‹ Previous"),next=btn("Next ›");TextView info=tv("Page "+(gridPage+1)+" / "+pages,15);p.addView(prev);p.addView(info);p.addView(next);prev.setEnabled(gridPage>0);next.setEnabled(gridPage<pages-1);prev.setOnClickListener(v->{gridPage--;refreshLocal();});next.setOnClickListener(v->{gridPage++;refreshLocal();});list.addView(p);}
+    void addFileColumnRow(File f){LinearLayout r=new LinearLayout(this);r.setGravity(Gravity.CENTER_VERTICAL);r.setPadding(8,8,8,8);TextView n=tv((f.isDirectory()?"📁 ":icon(f)+" ")+f.getName(),20);r.addView(n,new LinearLayout.LayoutParams(0,-2,1));TextView z=tv(f.isDirectory()?"Folder":human(f.length()),16);r.addView(z);r.setOnClickListener(v->{if(f.isDirectory())openLocal(f);else selectOne(f);});r.setOnLongClickListener(v->{selectOne(f);return true;});list.addView(r);}
+    void addFileTableRow(File f){LinearLayout r=new LinearLayout(this);r.setOrientation(LinearLayout.HORIZONTAL);r.setGravity(Gravity.CENTER_VERTICAL);r.setPadding(8,8,8,8);addCell(r,(f.isDirectory()?"📁 ":icon(f)+" ")+f.getName(),1.8f,17);addCell(r,f.isDirectory()?"Folder":extName(f.getName()),0.8f,14);addCell(r,f.isDirectory()?"—":human(f.length()),0.8f,14);addCell(r,new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.US).format(new Date(f.lastModified())),1.2f,13);r.setOnClickListener(v->{if(f.isDirectory())openLocal(f);else selectOne(f);});r.setOnLongClickListener(v->{selectOne(f);return true;});list.addView(r);}
+    View createFileGridCell(File f){LinearLayout c=new LinearLayout(this);c.setOrientation(LinearLayout.VERTICAL);c.setGravity(Gravity.CENTER);c.setPadding(4,12,4,12);c.setMinimumHeight(150);TextView ic=tv(f.isDirectory()?"📁":icon(f),56);ic.setGravity(Gravity.CENTER);c.addView(ic,new LinearLayout.LayoutParams(-1,78));TextView n=tv(f.getName(),15);n.setGravity(Gravity.CENTER);c.addView(n,new LinearLayout.LayoutParams(-1,-2));TextView z=tv(f.isDirectory()?"Folder":human(f.length()),13);z.setGravity(Gravity.CENTER);c.addView(z,new LinearLayout.LayoutParams(-1,-2));c.setOnClickListener(v->{if(f.isDirectory())openLocal(f);else selectOne(f);});c.setOnLongClickListener(v->{selectOne(f);return true;});return c;}
+    void addCell(LinearLayout parent,String text,float weight,int size){TextView t=tv(text,size);t.setSingleLine(true);t.setEllipsize(android.text.TextUtils.TruncateAt.END);parent.addView(t,new LinearLayout.LayoutParams(0,-2,weight));}
+    void chooseView(){String[] modes={"Column view","Table view","Grid view"};int checked=displayMode.equals("column")?0:displayMode.equals("table")?1:2;new AlertDialog.Builder(this).setTitle("View mode").setSingleChoiceItems(modes,checked,(d,w)->{displayMode=w==0?"column":w==1?"table":"grid";prefs.edit().putString("view",displayMode).apply();gridPage=0;d.dismiss();if(currentDir!=null)refreshLocal();else if(currentTree!=null)openCloud(currentTree);else showHome();}).setNeutralButton("Grid rows / columns",(d,w)->gridSettings()).show();}
+    void gridSettings(){LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(30,10,30,0);TextView c=tv("Columns: "+gridColumns,16);SeekBar cs=new SeekBar(this);cs.setMax(5);cs.setProgress(gridColumns-1);TextView r=tv("Rows: "+gridRows,16);SeekBar rs=new SeekBar(this);rs.setMax(9);rs.setProgress(gridRows-1);box.addView(c);box.addView(cs);box.addView(r);box.addView(rs);cs.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar b,int p,boolean f){c.setText("Columns: "+(p+1));}public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){gridColumns=b.getProgress()+1;}});rs.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar b,int p,boolean f){r.setText("Rows: "+(p+1));}public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){gridRows=b.getProgress()+1;}});new AlertDialog.Builder(this).setTitle("Grid size").setView(box).setPositiveButton("Apply",(d,w)->{prefs.edit().putInt("gridColumns",gridColumns).putInt("gridRows",gridRows).apply();gridPage=0;if(currentDir!=null)refreshLocal();else if(currentTree!=null)openCloud(currentTree);}).setNegativeButton("Cancel",null).show();}
+
     void selectOne(File f){selected.clear();selected.add(f);status.setText("Selected: "+f.getName());}
 
-    void action(String s){try{switch(s){case"☰":showHome();break;case"←":goBack();break;case"⟳":if(currentTree!=null)openCloud(currentTree);else refreshLocal();break;case"Select":selectMode();break;case"Copy":copy(false);break;case"Cut":copy(true);break;case"Paste":paste();break;case"Delete":deleteSelected();break;case"Rename":rename();break;case"Share":share();break;case"ZIP":zipSelected();break;case"Properties":properties();break;case"Search":search();break;case"Cloud +":pickTree();break;case"Sort":chooseSort();break;case"Favorites":favorites();break;}}catch(Exception e){toast(e.getMessage());}}
+    void action(String s){try{switch(s){case"☰":showHome();break;case"←":goBack();break;case"⟳":if(currentTree!=null)openCloud(currentTree);else refreshLocal();break;case"Select":selectMode();break;case"Copy":copy(false);break;case"Cut":copy(true);break;case"Paste":paste();break;case"Delete":deleteSelected();break;case"Rename":rename();break;case"Share":share();break;case"ZIP":zipSelected();break;case"Properties":properties();break;case"Search":search();break;case"Cloud +":pickTree();break;case"Sort":chooseSort();break;case"View":chooseView();break;case"Favorites":favorites();break;}}catch(Exception e){toast(e.getMessage());}}
     void goBack(){if(currentDir!=null){File p=currentDir.getParentFile();if(p!=null&&p.getAbsolutePath().startsWith("/storage")){openLocal(p);return;}showHome();}else if(currentTree!=null){showHome();}else showHome();}
 
     void selectMode(){selected.clear();list.removeAllViews();if(currentDir!=null)for(File f:items){CheckBox c=new CheckBox(this);c.setText((f.isDirectory()?"📁 ":icon(f)+" ")+f.getName());c.setTextSize(17);c.setPadding(12,12,12,12);c.setOnCheckedChangeListener((b,x)->{if(x)selected.add(f);else selected.remove(f);});list.addView(c);}status.setText("Select files, then use an action");}
@@ -182,6 +192,7 @@ public class MainActivity extends Activity {
     String ext(File f){String n=f.getName();int p=n.lastIndexOf('.');return p>0?n.substring(p+1):"";}
     String icon(String name){String n=name==null?"":name.toLowerCase(Locale.ROOT);int p=n.lastIndexOf('.');String e=p>0?n.substring(p+1):"";if(e.matches("jpg|jpeg|png|gif|webp|bmp"))return"🖼️";if(e.matches("mp4|mkv|avi|mov|3gp"))return"🎬";if(e.matches("mp3|wav|flac|aac|ogg"))return"🎵";if(e.matches("zip|7z|rar|tar|gz"))return"🗜️";if(e.matches("pdf"))return"📕";if(e.matches("apk|xapk|apks|aab"))return"📦";return"📄";}
     String icon(File f){return icon(f.getName());}
-    String human(long n){if(n<1024)return n+" B";double x=n;String[]u={"KB","MB","GB","TB"};int i=0;while(x>=1024&&i<u.length-1){x/=1024;i++;}return String.format(Locale.US,"%.1f %s",x,u[i]);}
+    String human(long n){if(n<1024)return n+" B";double x=n;String[]u={"B","KB","MB","GB","TB","PB"};int i=0;while(x>=1024&&i<u.length-1){x/=1024;i++;}if(i==0)return String.format(Locale.US,"%.0f B",x);if(x>=100)return String.format(Locale.US,"%.0f %s",x,u[i]);if(x>=10)return String.format(Locale.US,"%.1f %s",x,u[i]);return String.format(Locale.US,"%.2f %s",x,u[i]);}
+    String extName(String name){if(name==null)return "";int p=name.lastIndexOf('.');return p>0?name.substring(p+1).toUpperCase(Locale.ROOT):"";}
     void toast(String s){Toast.makeText(this,s==null?"Error":s,Toast.LENGTH_LONG).show();}
 }
