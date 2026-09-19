@@ -1,21 +1,15 @@
-Cloud Explorer Final 1.0
+Cloud Explorer - Real Storage/Cloud Explorer
 
-نسخه تمیز و نهایی پروژه پایه File Explorer + Cloud برای Android.
-
-قابلیت‌های پیاده‌سازی‌شده:
-- نمایش Internal Storage و مسیرهای قابل دسترس سیستم
-- انتخاب Storage / SD / USB / HDD و Cloud از Android Storage Access Framework
+این نسخه هسته واقعی مرور فایل را دارد.
+- درخواست و بررسی دسترسی حافظه گوشی
+- بازکردن Internal Storage و Storageهای متصل که Android در مسیر /storage در اختیار برنامه قرار دهد
 - ورود به پوشه و برگشت
-- نمایش فایل و پوشه با نوع و اندازه
+- نمایش فایل‌ها و پوشه‌ها با اندازه
 - انتخاب چندگانه
-- Copy / Cut / Paste / Delete / Rename
-- Share فایل‌ها با FileProvider و برنامه‌های دیگر
-- افزودن Cloud Provider از طریق ACTION_OPEN_DOCUMENT_TREE؛ سرویس‌هایی مثل Google Drive، Dropbox، OneDrive و Box در صورت ارائه Provider توسط برنامه نصب‌شده قابل انتخاب‌اند
-- Favorites پایه
-- Search در پوشه جاری
-- Sort بر اساس Name / Type / Size / Modified
-- Properties و Copy متن اطلاعات
-- ساخت ZIP از فایل/پوشه انتخاب‌شده
-- تشخیص ظاهری انواع APK/XAPK/APKS/AAB، ZIP/RAR/7Z، PDF، تصویر، ویدئو و صدا
+- Copy / Cut / Paste / Delete / Rename / Share / ZIP / Properties / Search / Sort
+- افزودن Storage یا Cloud با Android Storage Access Framework
+- نگهداری دسترسی SAF برای استفاده بعدی
+- Google Drive / Dropbox / OneDrive / Box و Providerهای دیگر در صورتی که روی دستگاه به‌عنوان Document Provider ارائه شوند
+- FileProvider برای Share
 
-توجه: دسترسی به Storage و Cloud تابع مجوزهای Android و Provider نصب‌شده است. این پروژه عمداً بدون SDK اختصاصی سرویس‌های ابری ساخته شده تا APK سبک بماند.
+نکته: دسترسی کامل فایل‌ها در Android به نسخه سیستم، مجوزها و سیاست دستگاه بستگی دارد. در Android 11 و بالاتر برنامه در صورت نیاز صفحه Allow access to manage all files را باز می‌کند.
